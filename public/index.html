@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bias Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+  :root {
+    --bg:#0d0d0d;--bg2:#141414;--bg3:#1a1a1a;
+    --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+    --text:#e8e8e8;--text2:#888;--text3:#555;
+    --green:#4ade80;--green-bg:rgba(74,222,128,0.08);--green-border:rgba(74,222,128,0.25);
+    --red:#f87171;--red-bg:rgba(248,113,113,0.08);--red-border:rgba(248,113,113,0.25);
+    --blue:#60a5fa;--blue-bg:rgba(96,165,250,0.08);--blue-border:rgba(96,165,250,0.25);
+    --amber:#fbbf24;--amber-bg:rgba(251,191,36,0.08);--amber-border:rgba(251,191,36,0.25);
+    --radius:10px;--font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-weight:300;min-height:100vh;padding:2rem 1rem;}
+  .container{max-width:740px;margin:0 auto;}
+  header{display:flex;align-items:baseline;gap:12px;margin-bottom:2.5rem;padding-bottom:1.25rem;border-bottom:0.5px solid var(--border);}
+  header h1{font-size:18px;font-weight:500;letter-spacing:-0.01em;}
+  header span{font-size:13px;color:var(--text3);font-family:var(--mono);}
+  .section{margin-bottom:1.25rem;}
+  .label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:var(--text3);margin-bottom:8px;font-family:var(--mono);}
+  .drop-zone{border:1px dashed var(--border2);border-radius:var(--radius);padding:3rem 1.5rem;text-align:center;cursor:pointer;background:var(--bg2);position:relative;transition:all 0.15s;}
+  .drop-zone:hover,.drop-zone.drag{border-color:rgba(255,255,255,0.3);background:var(--bg3);}
+  .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .drop-icon{font-size:22px;margin-bottom:10px;opacity:0.4;}
+  .drop-text{font-size:14px;color:var(--text2);}
+  .drop-sub{font-size:12px;color:var(--text3);margin-top:4px;}
+  .preview-wrap{position:relative;border-radius:var(--radius);overflow:hidden;border:0.5px solid var(--border2);}
+  .preview-wrap img{width:100%;display:block;max-height:380px;object-fit:contain;background:#000;}
+  .preview-clear{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.75);color:#fff;border:0.5px solid var(--border2);border-radius:50%;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  select,textarea,input[type=text]{width:100%;padding:9px 12px;font-size:13px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);outline:none;}
+  select:focus,textarea:focus,input[type=text]:focus{border-color:rgba(255,255,255,0.3);}
+  textarea{resize:none;line-height:1.6;}
+
+  .btn{width:100%;padding:11px;font-size:14px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text);cursor:pointer;font-family:var(--font);transition:background 0.15s,border-color 0.15s;margin-top:0.75rem;}
+  .btn:hover{background:var(--bg3);border-color:rgba(255,255,255,0.3);}
+  .btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .btn-sm{width:100%;padding:9px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text3);cursor:pointer;font-family:var(--mono);transition:all 0.15s;margin-top:0.5rem;letter-spacing:0.03em;}
+  .btn-sm:hover{background:var(--bg3);color:var(--text2);border-color:var(--border2);}
+  .btn-sm:disabled{opacity:0.35;cursor:not-allowed;}
+  .btn-warn{border-color:rgba(251,191,36,0.3);color:var(--amber);}
+  .btn-warn:hover{background:var(--amber-bg);border-color:var(--amber-border);}
+
+  .spinner{display:inline-block;width:13px;height:13px;border:1.5px solid var(--border2);border-top-color:var(--text);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:7px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Result block */
+  .result{display:none;margin-top:1.25rem;}
+  .bias-header{display:flex;align-items:center;gap:12px;padding:1rem 1.25rem;background:var(--bg2);border:0.5px solid var(--border);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;}
+  .bias-badge{font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;font-family:var(--mono);letter-spacing:0.05em;}
+  .bias-bull{background:var(--green-bg);color:var(--green);border:0.5px solid var(--green-border);}
+  .bias-bear{background:var(--red-bg);color:var(--red);border:0.5px solid var(--red-border);}
+  .bias-neu{background:var(--blue-bg);color:var(--blue);border:0.5px solid var(--blue-border);}
+  .bias-inst{font-size:12px;color:var(--text3);font-family:var(--mono);}
+  .result-body{background:var(--bg2);border:0.5px solid var(--border);padding:1.25rem;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;}
+
+  /* Re-analyze correction box */
+  .correction-box{background:var(--bg2);border:0.5px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem 1.25rem;}
+  .correction-label{font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;}
+  .correction-row{display:flex;gap:8px;}
+  .correction-row input{flex:1;}
+  .correction-send{padding:9px 16px;font-size:12px;font-family:var(--mono);background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+  .correction-send:hover{color:var(--text);border-color:rgba(255,255,255,0.3);}
+  .correction-send:disabled{opacity:0.35;cursor:not-allowed;}
+
+  /* Scenarios */
+  .scenarios{display:none;margin-top:1rem;}
+  .scenarios-header{padding:0.75rem 1.25rem;background:var(--bg2);border:0.5px solid var(--border);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:var(--text3);font-family:var(--mono);}
+  .scenarios-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:0.5px solid var(--border);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;}
+  .scenario{padding:1.1rem 1.25rem;background:var(--bg);}
+  .scenario:first-child{border-right:0.5px solid var(--border);}
+  .scenario-tag{font-size:10px;font-weight:500;font-family:var(--mono);letter-spacing:0.08em;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:10px;}
+  .tag-bull{background:var(--green-bg);color:var(--green);border:0.5px solid var(--green-border);}
+  .tag-bear{background:var(--red-bg);color:var(--red);border:0.5px solid var(--red-border);}
+  .scenario-body{font-size:13px;line-height:1.75;color:var(--text2);white-space:pre-wrap;}
+
+  /* Sentiment */
+  .sentiment-section{margin-top:0.6rem;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;display:none;}
+  .sentiment-header{display:flex;align-items:center;justify-content:space-between;padding:0.65rem 1.25rem;background:var(--bg2);border-bottom:0.5px solid var(--border);}
+  .sentiment-title{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:var(--text3);font-family:var(--mono);}
+  .sent-badges{display:flex;align-items:center;gap:8px;}
+  .sentiment-badge{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;font-family:var(--mono);}
+  .s-bull{background:var(--green-bg);color:var(--green);border:0.5px solid var(--green-border);}
+  .s-bear{background:var(--red-bg);color:var(--red);border:0.5px solid var(--red-border);}
+  .s-mix{background:var(--amber-bg);color:var(--amber);border:0.5px solid var(--amber-border);}
+  .positioning-bar{margin:0.75rem 1.25rem;}
+  .pos-labels{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);margin-bottom:5px;}
+  .pos-long{color:var(--green);}
+  .pos-short{color:var(--red);}
+  .bar-track{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--red));border-radius:3px;transition:width 0.5s ease;}
+  .sentiment-body{padding:1rem 1.25rem;font-size:13px;line-height:1.75;color:var(--text2);white-space:pre-wrap;background:var(--bg);}
+
+  .divider{height:0.5px;background:var(--border);margin:1.25rem 0;}
+  .err{color:var(--red);font-size:12px;margin-top:8px;font-family:var(--mono);display:none;}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Bias Analyzer</h1>
+    <span>order flow · price action · key levels</span>
+  </header>
+
+  <div class="section">
+    <div class="label">Chart screenshot</div>
+    <div id="dropZone" class="drop-zone">
+      <input type="file" id="fileInput" accept="image/*" />
+      <div class="drop-icon">↑</div>
+      <div class="drop-text">Drag chart here or click to upload</div>
+      <div class="drop-sub">TradingView · ATAS · PNG · JPG</div>
+    </div>
+    <div id="previewWrap" class="preview-wrap" style="display:none;">
+      <img id="previewImg" src="" alt="chart" />
+      <button class="preview-clear" onclick="clearImg()">✕</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">Context (optional)</div>
+    <div class="row2" style="margin-bottom:10px;">
+      <select id="instrument">
+        <option value="EURUSD">EURUSD</option>
+        <option value="BTC">Bitcoin (BTC)</option>
+        <option value="NQ">NAS100 / NQ</option>
+        <option value="ES">S&amp;P500 / ES</option>
+        <option value="GBPUSD">GBPUSD</option>
+        <option value="XAUUSD">Gold (XAUUSD)</option>
+        <option value="from chart">Read from chart</option>
+      </select>
+      <select id="tf">
+        <option value="15min">15min</option>
+        <option value="30min">30min</option>
+        <option value="1H" selected>1H</option>
+        <option value="4H">4H</option>
+        <option value="Daily">Daily</option>
+        <option value="from chart">Read from chart</option>
+      </select>
+    </div>
+    <textarea id="notes" rows="2" placeholder="Additional context: FVG zones, order blocks, notes..."></textarea>
+  </div>
+
+  <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze chart ↗</button>
+  <div class="err" id="err"></div>
+
+  <!-- Main result -->
+  <div class="result" id="result">
+    <div class="bias-header">
+      <span class="bias-badge" id="biasBadge"></span>
+      <span class="bias-inst" id="biasInst"></span>
+    </div>
+    <div class="result-body" id="resultBody"></div>
+
+    <!-- Re-analyze correction input -->
+    <div class="correction-box">
+      <div class="correction-label">Spotted a mistake? Correct Claude ↓</div>
+      <div class="correction-row">
+        <input type="text" id="correctionInput" placeholder='e.g. "pdH is 1.1550 not 1.1500, wPOC is missing"' />
+        <button class="correction-send" id="correctionBtn" onclick="reanalyze()">Re-analyze ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trade scenarios -->
+  <div class="scenarios" id="scenarios">
+    <div class="scenarios-header">Trade scenarios</div>
+    <div class="scenarios-grid">
+      <div class="scenario" id="scenarioBull">
+        <span class="scenario-tag tag-bull">▲ Bullish scenario</span>
+        <div class="scenario-body" id="scenarioBullBody"></div>
+      </div>
+      <div class="scenario" id="scenarioBear">
+        <span class="scenario-tag tag-bear">▼ Bearish scenario</span>
+        <div class="scenario-body" id="scenarioBearBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sentiment -->
+  <button class="btn-sm" id="sentimentBtn" style="display:none;" onclick="fetchSentiment()">
+    + Search X / community sentiment &amp; positioning ↗
+  </button>
+
+  <div class="sentiment-section" id="sentimentSection">
+    <div class="sentiment-header">
+      <span class="sentiment-title">X / Community sentiment</span>
+      <div class="sent-badges">
+        <span class="sentiment-badge" id="sentBadge" style="display:none;"></span>
+      </div>
+    </div>
+    <div class="positioning-bar" id="posBar" style="display:none;">
+      <div class="pos-labels">
+        <span class="pos-long" id="posLongLabel">Longs 50%</span>
+        <span class="pos-short" id="posShortLabel">Shorts 50%</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="barFill" style="width:50%;"></div>
+      </div>
+    </div>
+    <div class="sentiment-body" id="sentimentBody"></div>
+  </div>
+</div>
+
+<script>
+let b64=null, mime='image/png', lastAnalysis='';
+
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+
+fileInput.addEventListener('change',e=>{if(e.target.files[0])load(e.target.files[0]);});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag');if(e.dataTransfer.files[0])load(e.dataTransfer.files[0]);});
+
+function load(file){
+  mime=file.type||'image/png';
+  const r=new FileReader();
+  r.onload=ev=>{
+    b64=ev.target.result.split(',')[1];
+    document.getElementById('previewImg').src=ev.target.result;
+    dropZone.style.display='none';
+    document.getElementById('previewWrap').style.display='block';
+    document.getElementById('err').style.display='none';
+  };
+  r.readAsDataURL(file);
+}
+
+function clearImg(){
+  b64=null;
+  document.getElementById('previewImg').src='';
+  document.getElementById('previewWrap').style.display='none';
+  dropZone.style.display='block';
+  fileInput.value='';
+}
+
+function showErr(msg){
+  const el=document.getElementById('err');
+  el.textContent=msg;el.style.display='block';
+}
+
+function setBias(text){
+  const m=text.match(/\b(bullish|bearish|neutral)\b/i);
+  let cls='bias-neu',label='◆ NEUTRAL';
+  if(m){
+    const b=m[0].toLowerCase();
+    if(b==='bullish'){cls='bias-bull';label='▲ BULLISH';}
+    else if(b==='bearish'){cls='bias-bear';label='▼ BEARISH';}
+  }
+  document.getElementById('biasBadge').className='bias-badge '+cls;
+  document.getElementById('biasBadge').textContent=label;
+}
+
+async function callAPI(body){
+  const res=await fetch('/api/analyze',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){const e=await res.json();throw new Error(e.error||res.status);}
+  const data=await res.json();
+  return data.content?.map(b=>b.text||'').join('')||'';
+}
+
+async function analyze(){
+  if(!b64){showErr('Upload a chart screenshot first.');return;}
+
+  const instrument=document.getElementById('instrument').value;
+  const tf=document.getElementById('tf').value;
+  const notes=document.getElementById('notes').value;
+  const btn=document.getElementById('analyzeBtn');
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Analyzing chart...';
+  document.getElementById('result').style.display='none';
+  document.getElementById('scenarios').style.display='none';
+  document.getElementById('sentimentBtn').style.display='none';
+  document.getElementById('sentimentSection').style.display='none';
+  document.getElementById('err').style.display='none';
+
+  const prompt=`Analyze this ${tf} chart for ${instrument}. Identify ALL visible key levels with their exact values (pwH, pwL, pwVAH, pwVAL, pwPOC, pdH, pdL, pdPOC, wPOC, wVAH, wVAL, mO, FVG zones, order blocks), trend structure (HH/HL or LH/LL), and HTF bias.
+
+Provide:
+1. BIAS — Bullish / Bearish / Neutral with reasoning
+2. KEY LEVELS IDENTIFIED — list all levels you read from the chart with values
+3. KEY ENTRY LEVEL — where to wait for price
+4. INVALIDATION — when is the bias wrong
+5. WARNINGS — risks today
+
+${notes?'Additional context: '+notes:''}
+
+Be precise with level values — read them carefully from the chart.`;
+
+  try{
+    const text=await callAPI({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1200,
+      system:'You are an experienced order flow and price action trader. Analyze charts precisely and list ALL visible key levels with their exact numerical values. Be meticulous about reading price levels correctly.',
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+        {type:'text',text:prompt}
+      ]}]
+    });
+
+    lastAnalysis=text;
+    setBias(text);
+    document.getElementById('biasInst').textContent=instrument+' · '+tf+' · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('resultBody').textContent=text;
+    document.getElementById('result').style.display='block';
+
+    // Auto-fetch scenarios
+    await fetchScenarios(instrument, tf, text);
+
+    document.getElementById('sentimentBtn').style.display='block';
+  }catch(e){showErr('Error: '+e.message);}
+
+  btn.disabled=false;
+  btn.innerHTML='Analyze chart ↗';
+}
+
+async function reanalyze(){
+  const correction=document.getElementById('correctionInput').value.trim();
+  if(!correction){return;}
+  if(!b64){showErr('Chart image missing.');return;}
+
+  const instrument=document.getElementById('instrument').value;
+  const tf=document.getElementById('tf').value;
+  const btn=document.getElementById('correctionBtn');
+
+  btn.disabled=true;
+  btn.textContent='Re-analyzing...';
+
+  const prompt=`I previously analyzed this ${tf} chart and got this result:
+
+${lastAnalysis}
+
+The user spotted these mistakes or corrections:
+"${correction}"
+
+Please re-analyze the chart carefully with these corrections in mind. Re-read ALL key levels from the chart precisely. Provide the full updated analysis:
+
+1. BIAS — Bullish / Bearish / Neutral with reasoning
+2. KEY LEVELS IDENTIFIED — corrected list with exact values
+3. KEY ENTRY LEVEL
+4. INVALIDATION
+5. WARNINGS
+
+Be especially careful about the levels the user corrected.`;
+
+  try{
+    const text=await callAPI({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1200,
+      system:'You are an experienced order flow trader. Re-analyze this chart carefully, incorporating the user corrections. Be meticulous about reading price levels.',
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+        {type:'text',text:prompt}
+      ]}]
+    });
+
+    lastAnalysis=text;
+    setBias(text);
+    document.getElementById('resultBody').textContent=text;
+    document.getElementById('correctionInput').value='';
+
+    // Refresh scenarios with corrected analysis
+    const instrument2=document.getElementById('instrument').value;
+    const tf2=document.getElementById('tf').value;
+    await fetchScenarios(instrument2, tf2, text);
+
+  }catch(e){showErr('Re-analyze error: '+e.message);}
+
+  btn.disabled=false;
+  btn.textContent='Re-analyze ↗';
+}
+
+async function fetchScenarios(instrument, tf, analysis){
+  const scenariosEl=document.getElementById('scenarios');
+  scenariosEl.style.display='none';
+
+  const prompt=`Based on this ${tf} chart analysis for ${instrument}:
+
+${analysis}
+
+Give me exactly TWO trade scenarios — one bullish, one bearish. For each scenario provide:
+- Entry: exact price level / condition to enter
+- Stop Loss: exact level
+- Target 1: first take profit
+- Target 2: second take profit  
+- Trigger: what needs to happen for this scenario to activate
+- R:R ratio
+
+Format exactly like this:
+
+BULLISH SCENARIO
+Entry: [level]
+Stop Loss: [level]
+Target 1: [level]
+Target 2: [level]
+Trigger: [condition]
+R:R: [ratio]
+
+BEARISH SCENARIO
+Entry: [level]
+Stop Loss: [level]
+Target 1: [level]
+Target 2: [level]
+Trigger: [condition]
+R:R: [ratio]`;
+
+  try{
+    const text=await callAPI({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:600,
+      system:'You are a precise order flow trader. Give exact trade scenarios with specific price levels. No waffle.',
+      messages:[{role:'user',content:[{type:'text',text:prompt}]}]
+    });
+
+    // Parse bull and bear
+    const bullMatch=text.match(/BULLISH SCENARIO\n([\s\S]*?)(?=BEARISH SCENARIO|$)/i);
+    const bearMatch=text.match(/BEARISH SCENARIO\n([\s\S]*?)$/i);
+
+    document.getElementById('scenarioBullBody').textContent=bullMatch?bullMatch[1].trim():text;
+    document.getElementById('scenarioBearBody').textContent=bearMatch?bearMatch[1].trim():'See full analysis above.';
+    scenariosEl.style.display='block';
+  }catch(e){
+    // Silently fail scenarios, not critical
+  }
+}
+
+async function fetchSentiment(){
+  const instrument=document.getElementById('instrument').value;
+  const btn=document.getElementById('sentimentBtn');
+  const section=document.getElementById('sentimentSection');
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Searching X &amp; community...';
+  section.style.display='none';
+
+  try{
+    const res=await fetch('/api/sentiment',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({instrument})
+    });
+    if(!res.ok){const e=await res.json();showErr('Sentiment error: '+(e.error||res.status));return;}
+    const data=await res.json();
+    const text=data.sentiment||'No data found.';
+
+    // Parse sentiment badge
+    const sm=text.match(/SENTIMENT:\s*(Bullish|Bearish|Mixed)/i);
+    const sentBadge=document.getElementById('sentBadge');
+    if(sm){
+      const sv=sm[1].toLowerCase();
+      sentBadge.textContent=sv==='bullish'?'▲ Bullish':sv==='bearish'?'▼ Bearish':'◆ Mixed';
+      sentBadge.className='sentiment-badge '+(sv==='bullish'?'s-bull':sv==='bearish'?'s-bear':'s-mix');
+      sentBadge.style.display='inline-block';
+    }
+
+    // Parse positioning %
+    const posMatch=text.match(/Longs?\s*[:\-]?\s*(\d+)%.*?Shorts?\s*[:\-]?\s*(\d+)%/i);
+    if(posMatch){
+      const longPct=parseInt(posMatch[1]);
+      const shortPct=parseInt(posMatch[2]);
+      document.getElementById('posLongLabel').textContent='Longs '+longPct+'%';
+      document.getElementById('posShortLabel').textContent='Shorts '+shortPct+'%';
+      document.getElementById('barFill').style.width=longPct+'%';
+      document.getElementById('posBar').style.display='block';
+    }
+
+    document.getElementById('sentimentBody').textContent=text;
+    section.style.display='block';
+  }catch(e){showErr('Sentiment error: '+e.message);}
+
+  btn.disabled=false;
+  btn.innerHTML='+ Search X / community sentiment &amp; positioning ↗';
+}
+</script>
+</body>
+</html>
